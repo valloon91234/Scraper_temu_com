@@ -5,11 +5,13 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 
 internal class Main
 {
@@ -17,7 +19,7 @@ internal class Main
     {
         var urlList = File.ReadAllText("link.txt").Split("\r\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         Logger.WriteLine($"{urlList.Count} URL addresses loaded.", ConsoleColor.DarkGray);
-        var proxyList = File.ReadAllText("proxy4s.txt").Split("\r\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var proxyList = File.ReadAllText("proxy.txt").Split("\r\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
         //var proxyList = new List<string>();
         //while (true)
@@ -48,8 +50,10 @@ internal class Main
         {
             PreRequest = delegate (HttpWebRequest webRequest)
             {
-                webRequest.Timeout = 10000;
-                webRequest.ReadWriteTimeout = 10000;
+                webRequest.Timeout = 15000;
+                webRequest.ReadWriteTimeout = 15000;
+                webRequest.Headers.Add("cookie", "region=211; language=en; currency=USD; api_uid=Cmy1OGPVZ02c+ABjA9ByAg==; timezone=Asia%2FYakutsk; goods=goods_tpfizn; webp=1; _nano_fp=XpE8n0UqX09YnqXxl9_sclH7H381jrq8DujRPX90; _bee=qCl6HDlDof6ys0cxWoXZcAGn6kqkOapO; njrpl=qCl6HDlDof6ys0cxWoXZcAGn6kqkOapO; dilx=60jWYP5aQ2U_1qVaT7K0h; _gcl_au=1.1.372831831.1674930049; gtm_logger_session=hnq4po8p4z9d2pwh2osu0; shipping_city=211; _ga=GA1.1.1441921199.1674930064; _device_tag=CgI2WRIIWG9MU3RkbnkaMBwf93B9+nX9qTmstsyu3xzaDXfJw5ZQ56riaxalhiGYk64ZYogVSw6JgFF0lRzKnjAC; AccessToken=BMEU2WAM3KKYLC6YRMK7O23OEFOFLHRRD4M6RA4PTJ37W57CGASQ0110d3c16c7d; user_uin=BD5TE4BKUCXNMLFPZK2SLALH3Q2T235SSK555BRW; PDDAccessToken=BMEU2WAM3KKYLC6YRMK7O23OEFOFLHRRD4M6RA4PTJ37W57CGASQ0110d3c16c7d; pdd_user_uin=BD5TE4BKUCXNMLFPZK2SLALH3Q2T235SSK555BRW; pdd_user_id=BD5TE4BKUCXNMLFPZK2SLALH3Q2T235SSK555BRW; _ga_R8YHFZCMMX=GS1.1.1674930063.1.1.1674930081.42.0.0");
+                webRequest.Headers.Add("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36");
                 return true;
             }
         };
@@ -68,8 +72,7 @@ internal class Main
             Logger.WriteLine($"{proxyIndex + 1} / {proxyList.Count} \t {proxy}", ConsoleColor.DarkGray);
             var webProxy = new WebProxy
             {
-                //Address = new Uri($"http://{proxy}"),
-                Address = new Uri($"socks5://{proxy}"),
+                Address = new Uri(proxy),
                 BypassProxyOnLocal = true
             };
             //if (Debugger.IsAttached) webProxy = null;
@@ -87,15 +90,15 @@ internal class Main
                         Logger.WriteLine($"title = \t {value}");
                     }
                     {
-                        var value = doc.DocumentNode.QuerySelector(".curPrice-3HfXr span[data-type=price]").InnerText;
+                        var value = doc.DocumentNode.QuerySelector("div[class^=curPrice] span[data-type=price]").InnerText;
                         value = HtmlEntity.DeEntitize(value);
                         csvWriter.WriteField(value);
                         Logger.WriteLine($"price = \t {value}");
                     }
                     {
                         var value = "";
-                        if (doc.DocumentNode.QuerySelectorAll(".prefixClsRtl-6Uznm>ol>li:nth-child(3)>a").Any())
-                            value = doc.DocumentNode.QuerySelector(".prefixClsRtl-6Uznm>ol>li:nth-child(3)>a").InnerText;
+                        if (doc.DocumentNode.QuerySelectorAll("nav[class^=prefixClsRtl]>ol>li:nth-child(3)>a").Any())
+                            value = doc.DocumentNode.QuerySelector("nav[class^=prefixClsRtl]>ol>li:nth-child(3)>a").InnerText;
                         value = HtmlEntity.DeEntitize(value);
                         csvWriter.WriteField(value);
                         Logger.WriteLine($"category = \t {value}");
@@ -142,6 +145,10 @@ internal class Main
                         csvWriter.WriteField(value);
                         Logger.WriteLine($"Color/Size/Material = \t {value}");
                     }
+                    else
+                    {
+                        csvWriter.WriteField("");
+                    }
                     {
                         var nodeList = doc.DocumentNode.QuerySelectorAll(".wrap-B_OB3 .item-1YBVO").ToList();
                         var list = new List<string>();
@@ -160,7 +167,8 @@ internal class Main
                         var list = new List<string>();
                         foreach (var node in nodeList)
                         {
-                            list.Add(node.Attributes["src"].Value);
+                            if (node.Attributes["src"] != null)
+                                list.Add(node.Attributes["src"].Value);
                         }
                         var value = string.Join(" +++++ ", list);
                         csvWriter.WriteField(value);
@@ -208,6 +216,12 @@ internal class Main
                     soldCount++;
                     urlList.RemoveAt(urlIndex);
                     File.WriteAllLines("link.txt", urlList);
+                    File.AppendAllText("link_soldout.txt", url + Environment.NewLine);
+                    //if (soldCount > 30)
+                    //{
+                    //    Logger.WriteLine($"soldCount = {soldCount}", ConsoleColor.Red);
+                    //    break;
+                    //}
                 }
                 else
                 {
@@ -216,11 +230,14 @@ internal class Main
                     failedCount++;
                     if (failedCount % proxyList.Count == 0)
                     {
-                        for (int i = 0; i < 60; i++)
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        for (int i = 1800; i >= 0; i--)
                         {
-                            Logger.WriteLine($"Sleeping {60 - i} min...", ConsoleColor.DarkYellow);
-                            Thread.Sleep(60000);
+                            Console.Write($"\rSleeping {TimeSpan.FromSeconds(i):mm\\:ss} ...");
+                            Thread.Sleep(1000);
                         }
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.WriteLine();
                     }
                 }
             }
