@@ -1,5 +1,5 @@
 ﻿// See https://aka.ms/new-console-template for more information
-Main.Start2();
+Main.Start();
 
 Console.WriteLine();
 Console.WriteLine();
